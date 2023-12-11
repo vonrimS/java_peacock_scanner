@@ -14,31 +14,26 @@ import static von.rims.constants.AppConstants.FILE_URL;
 public class DataProcessor {
 
     public void processData() throws IOException {
-        List<List<String>> records = readDataFromUrl();
+//        List<List<String>> records = readDataFromUrl();
+        List<List<String>> records = readDataFromFile("input_test.txt");
         Map<String, Map<Integer, List<List<String>>>> uniqueRecords = groupUniqueRecords(records);
-        Map<Integer, List<List<String>>> simplifiedRecords = simplifyGroupedData(uniqueRecords);
+        Map<String, Map<Integer, List<List<String>>>> sortedRecords = sortMapInDscOrder(uniqueRecords);
+        Map<Integer, List<List<String>>> simplifiedRecords = simplifyGroupedData(sortedRecords);
         writeResultsToFile(simplifiedRecords);
     }
 
-    private static List<String> readDataFromFile(String fileName) throws IOException {
-        List<String> validRecords = new ArrayList<>();
-
-        int validCounter = 0;
-        int totalCounter = 0;
+    private static List<List<String>> readDataFromFile(String fileName) throws IOException {
+        List<List<String>> validRecords = new ArrayList<>();
 
         try (BufferedReader bufferedReader = new BufferedReader(new FileReader(fileName))) {
             String line;
             while ((line = bufferedReader.readLine()) != null) {
-                totalCounter++;
                 if (isValidLine(line)) {
-                    validCounter++;
-                    validRecords.add(line);
+                    List<String> recordValues = Arrays.asList(line.split(";"));
+                    validRecords.add(recordValues);
                 }
             }
         }
-
-        System.out.println(totalCounter);
-        System.out.println(validCounter);
 
         return validRecords;
     }
@@ -86,25 +81,41 @@ public class DataProcessor {
     private static Map<String, Map<Integer, List<List<String>>>> groupUniqueRecords(List<List<String>> uniqueRecords) {
         Map<String, Map<Integer, List<List<String>>>> groupedData = new HashMap<>();
 
-        int maxLength = uniqueRecords.stream()
-                .mapToInt(List::size)
-                .max()
-                .orElse(0);
+        for (List<String> record : uniqueRecords) {
+            boolean matchFound = false; // Флаг для отслеживания совпадения
 
-        for (int i = 0; i < maxLength; i++) {
-            for (List<String> record : uniqueRecords) {
-                if (i < record.size()) {
-                    String elementValue = record.get(i);
+            for (int i = 0; i < record.size(); i++) {
+                String elementValue = record.get(i);
 
-                    if (!groupedData.containsKey(elementValue)) {
-                        groupedData.put(elementValue, new HashMap<>());
+                if (groupedData.containsKey(elementValue)){
+                    if (groupedData.get(elementValue).containsKey(i)){
+                        groupedData.get(elementValue).get(i).add(record);
+                        matchFound = true; // Совпадение найдено
+                        break;
                     }
+                }
+            }
 
+            // Если совпадение не найдено, создаем новый узел
+//            if (!matchFound) {
+//                for (int i = 0; i < record.size(); i++) {
+//                    String elementValue = record.get(i);
+//                    groupedData.putIfAbsent(elementValue, new HashMap<>());
+//                    groupedData.get(elementValue).putIfAbsent(i, new ArrayList<>());
+//                    groupedData.get(elementValue).get(i).add(record);
+//                    break;
+//                }
+//            }
+            // Если совпадение не найдено, создаем новый узел как во внешней, так и во внутренней Map
+            if (!matchFound) {
+                for (int i = 0; i < record.size(); i++) {
+                    String elementValue = record.get(i);
+                    groupedData.putIfAbsent(elementValue, new HashMap<>());
                     if (!groupedData.get(elementValue).containsKey(i)) {
                         groupedData.get(elementValue).put(i, new ArrayList<>());
                     }
-
                     groupedData.get(elementValue).get(i).add(record);
+                    break;
                 }
             }
         }
@@ -112,16 +123,57 @@ public class DataProcessor {
         return groupedData;
     }
 
+//    private static Map<String, Map<Integer, List<List<String>>>> groupUniqueRecords(List<List<String>> uniqueRecords) {
+//        Map<String, Map<Integer, List<List<String>>>> groupedData = new HashMap<>();
+//
+//        for (List<String> record : uniqueRecords) {
+//            for (int i = 0; i < record.size(); i++) {
+//                String elementValue = record.get(i);
+//
+//                if (groupedData.containsKey(elementValue)){
+//                    if (groupedData.get(elementValue).containsKey(i)){
+//                        groupedData.get(elementValue).get(i).add(record);
+//                        break;
+//                    }
+//                }
+//
+//                if (!groupedData.containsKey(elementValue)) {
+//                    groupedData.put(elementValue, new HashMap<>());
+//                }
+//
+//                if (!groupedData.get(elementValue).containsKey(i)) {
+//                    groupedData.get(elementValue).put(i, new ArrayList<>());
+//                }
+//
+//
+//            }
+//        }
+//
+//        return groupedData;
+//    }
 
-    private static Map<Integer, List<List<String>>> simplifyGroupedData(Map<String, Map<Integer, List<List<String>>>> groupedData) {
+    private static Map<String, Map<Integer, List<List<String>>>> sortMapInDscOrder(Map<String, Map<Integer, List<List<String>>>> groupedData) {
+        Map<String, Map<Integer, List<List<String>>>> sortedData = groupedData.entrySet()
+                .stream()
+                .sorted(Comparator.comparing((Map.Entry<String, Map<Integer, List<List<String>>>> entry) -> calculateSize(entry.getValue())).reversed())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1,
+                        LinkedHashMap::new
+                ));
+
+        return sortedData;
+    }
+
+    private static Map<Integer, List<List<String>>> simplifyGroupedData(Map<String, Map<Integer, List<List<String>>>> sortedData) {
         Map<Integer, List<List<String>>> simplifiedData = new LinkedHashMap<>();
 
-        List<Map.Entry<String, Map<Integer, List<List<String>>>>> sortedEntries = groupedData.entrySet().stream()
-                .sorted((entry1, entry2) -> Integer.compare(entry2.getValue().size(), entry1.getValue().size()))
-                .collect(Collectors.toList());
-
         int groupNumber = 1;
-        for (Map.Entry<String, Map<Integer, List<List<String>>>> entry : sortedEntries) {
+        Iterator<Map.Entry<String, Map<Integer, List<List<String>>>>> iterator = sortedData.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<String, Map<Integer, List<List<String>>>> entry = iterator.next();
             List<List<String>> mergedRecords = entry.getValue().values().stream()
                     .flatMap(List::stream)
                     .collect(Collectors.toList());
@@ -132,6 +184,13 @@ public class DataProcessor {
         return simplifiedData;
     }
 
+    private static int calculateSize(Map<Integer, List<List<String>>> innerMap) {
+        return innerMap.values()
+                .stream()
+                .flatMap(Collection::stream)
+                .mapToInt(List::size)
+                .sum();
+    }
 
     private static int countGroupsWithMultipleRecords(Map<Integer, List<List<String>>> groupedData) {
         int groupCount = 0;
@@ -162,9 +221,10 @@ public class DataProcessor {
             writer.write("\nГруппа " + groupId + ":\n");
 
             for (List<String> record : groupRecords) {
-                String formattedRecord = String.join("; ", record);
+                String formattedRecord = String.join(";", record);
 
                 writer.write(formattedRecord);
+                writer.write("\n");
             }
         }
         writer.close();
