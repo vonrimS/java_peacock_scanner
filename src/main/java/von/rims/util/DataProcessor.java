@@ -112,7 +112,6 @@ public class DataProcessor {
 
                 if (groupMapping.containsKey(key)) {
                     int groupIndex = groupMapping.get(key);
-                    System.out.println(groupIndex);
                     Set<List<String>> group = groupedData.get(groupIndex);
                     group.add(record);
 

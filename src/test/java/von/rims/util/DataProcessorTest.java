@@ -6,10 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -19,6 +16,7 @@ class DataProcessorTest {
     private static Method readDataFromUrl;
     private static Method isValidLine;
     private static Method groupUniqueRecords;
+    private static Method findLongestRecord;
 
     @BeforeAll
     public static void setUp() throws NoSuchMethodException {
@@ -32,6 +30,9 @@ class DataProcessorTest {
 
         isValidLine = DataProcessor.class.getDeclaredMethod("isValidLine", String.class);
         isValidLine.setAccessible(true);
+
+        findLongestRecord = DataProcessor.class.getDeclaredMethod("findLongestRecord", List.class);
+        findLongestRecord.setAccessible(true);
 
         groupUniqueRecords = DataProcessor.class.getDeclaredMethod("groupUniqueRecords", List.class);
         groupUniqueRecords.setAccessible(true);
@@ -55,42 +56,71 @@ class DataProcessorTest {
     }
 
     @Test
+    void testFindLongestRecord() throws InvocationTargetException, IllegalAccessException {
+        // Тестовый случай 1: Самая длинная запись в середине
+        List<List<String>> data1 = Arrays.asList(
+                Arrays.asList("A", "B", "C"),
+                Arrays.asList("X", "Y", "Z", "W"),
+                Arrays.asList("1", "2", "3")
+        );
+        List<String> longest1 =(List<String>) findLongestRecord.invoke(null, data1);
+        assertEquals(Arrays.asList("X", "Y", "Z", "W"), longest1);
+
+        // Тестовый случай 2: Самая длинная запись в начале
+        List<List<String>> data2 = Arrays.asList(
+                Arrays.asList("X", "Y", "Z", "W"),
+                Arrays.asList("A", "B", "C"),
+                Arrays.asList("1", "2", "3")
+        );
+        List<String> longest2 =(List<String>) findLongestRecord.invoke(null, data2);
+        assertEquals(Arrays.asList("X", "Y", "Z", "W"), longest2);
+
+        // Тестовый случай 3: Самая длинная запись в конце
+        List<List<String>> data3 = Arrays.asList(
+                Arrays.asList("1", "2", "3"),
+                Arrays.asList("A", "B", "C"),
+                Arrays.asList("X", "Y", "Z", "W")
+        );
+        List<String> longest3 =(List<String>) findLongestRecord.invoke(null, data3);
+        assertEquals(Arrays.asList("X", "Y", "Z", "W"), longest3);
+
+        // Тестовый случай 4: Единственная запись
+        List<List<String>> data4 = Arrays.asList(
+                Arrays.asList("A", "B", "C")
+        );
+        List<String> longest4 =(List<String>) findLongestRecord.invoke(null, data4);
+        assertEquals(Arrays.asList("A", "B", "C"), longest4);
+
+        // Тестовый случай 5: Все записи одной длины
+        List<List<String>> data5 = Arrays.asList(
+                Arrays.asList("A", "B", "C"),
+                Arrays.asList("A", "Y", "Z"),
+                Arrays.asList("A", "B", "W")
+        );
+        List<String> longest5 =(List<String>) findLongestRecord.invoke(null, data5);
+        assertEquals(Arrays.asList("A", "B", "C"), longest5);
+    }
+
+
+    @Test
     void testGroupUniqueRecords() throws InvocationTargetException, IllegalAccessException {
-        Map<String, Map<Integer, List<List<String>>>> result = (Map<String, Map<Integer, List<List<String>>>>) groupUniqueRecords.invoke(null, testUniqueRecords);
+        // Тестовые данные
+        List<List<String>> testData = new ArrayList<>();
+        testData.add(Arrays.asList("111", "123", "222"));
+        testData.add(Arrays.asList("200", "123", "100"));
+        testData.add(Arrays.asList("300", "", "100"));
 
-        // Проверка на наличие и корректность группы "Value1"
-        assertTrue(result.containsKey("Value1"));
-        Map<Integer, List<List<String>>> value1Group = result.get("Value1");
-        assertNotNull(value1Group);
-        assertEquals(2, value1Group.size()); // Должно быть два индекса: 0 и 1
+        // Ожида
+        Map<Integer, Set<List<String>>> expected = new HashMap<>();
+        Set<List<String>> group0 = new HashSet<>();
+        group0.add(Arrays.asList("111", "123", "222"));
+        group0.add(Arrays.asList("300", "", "100"));
+        group0.add(Arrays.asList("200", "123", "100"));
+        expected.put(0, group0);
 
-        // Проверка на наличие и корректность группы "Value2"
-        assertTrue(result.containsKey("Value2"));
-        Map<Integer, List<List<String>>> value2Group = result.get("Value2");
-        assertNotNull(value2Group);
-        assertEquals(2, value2Group.size()); // Должно быть два индекса: 0 и 1
+        Map<Integer, Set<List<String>>> result =
+                (Map<Integer, Set<List<String>>>) groupUniqueRecords.invoke(null, testData);
 
-        // Проверка содержимого групп
-        assertEquals(2, value1Group.get(0).size()); // Две записи в первой группе "Value1"
-        assertEquals(1, value1Group.get(1).size()); // Одна запись во второй группе "Value1"
-
-        assertEquals(1, value2Group.get(0).size()); // Одна запись в первой группе "Value2"
-        assertEquals(1, value2Group.get(1).size()); // Одна запись во второй группе "Value2"
-
-//        // Добавьте здесь проверки на корректность результатов
-//        assertNotNull(result);
-//        assertTrue(result.size() > 0);
-//
-//        assertEquals(2, result.size());
-
-//        // Примеры проверок
-//        assertTrue(result.containsKey("Value1"));
-//        assertTrue(result.containsKey("Value2"));
-//        assertTrue(result.containsKey("Value3"));
-//
-//        // Проверка на размер внутренних структур данных
-//        assertEquals(2, result.get("Value1").size());
-//        assertEquals(2, result.get("Value2").size());
-//        assertEquals(1, result.get("Value3").size());
+        assertEquals(expected, result);
     }
 }
